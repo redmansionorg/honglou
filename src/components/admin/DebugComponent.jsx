@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Novel, Chapter } from "@/api/entities";
 import { Button } from "@/components/ui/button";
@@ -113,7 +114,7 @@ export default function DebugComponent() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-white">调试工具</h2>
-        <Button onClick={loadData} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={loadData} className="bg-blue-600 hover:bg-blue-700 text-white">
           <Eye className="mr-2 h-4 w-4" />
           刷新数据
         </Button>
@@ -142,7 +143,7 @@ export default function DebugComponent() {
                   </div>
                   <Button 
                     onClick={() => createChaptersForNovel(novel.id, novel.title)}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 text-white"
                   >
                     创建章节
                   </Button>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { User, Novel, Chapter } from "@/api/entities";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { Label } from "@/components/ui/label";
 
 // Chapter Editor Component
 function ChapterEditor({ novelId, chapter, onSave, onClose }) {
+  // If chapter is null, it means we are creating a new chapter, so default values
   const [title, setTitle] = useState(chapter?.title || "");
   const [chapterNumber, setChapterNumber] = useState(chapter?.chapter_number || 1);
   const [content, setContent] = useState(chapter?.content || "");
@@ -26,7 +28,8 @@ function ChapterEditor({ novelId, chapter, onSave, onClose }) {
 
   const handleSave = async () => {
     setIsSaving(true);
-    const chapterData = {
+    const chapterDataToSave = {
+      id: chapter?.id, // Include ID if editing an existing chapter
       novel_id: novelId,
       title,
       chapter_number: parseInt(chapterNumber, 10),
@@ -36,14 +39,12 @@ function ChapterEditor({ novelId, chapter, onSave, onClose }) {
     };
 
     try {
-      if (chapter?.id) {
-        await Chapter.update(chapter.id, chapterData);
-      } else {
-        await Chapter.create(chapterData);
-      }
-      onSave();
+      // ChapterEditor no longer performs the actual Chapter.create/update or Novel.update
+      // It passes the data up to the parent component's onSave handler
+      await onSave(novelId, chapterDataToSave);
+      onClose(); // Close dialog on successful save initiated
     } catch (error) {
-      console.error("Failed to save chapter", error);
+      console.error("Failed to prepare chapter data for saving", error);
     } finally {
       setIsSaving(false);
     }
@@ -136,19 +137,66 @@ export default function CreatorDashboardComponent() {
     }
   };
   
-  const handleChapterSave = async () => {
-    setEditingChapter(null);
-    const novelChapters = await Chapter.filter({ novel_id: selectedNovelId }, "chapter_number");
-    setChapters(prev => ({ ...prev, [selectedNovelId]: novelChapters }));
+  // This new handleChapterSave takes chapter data from the editor and performs the save/update
+  const handleChapterSave = async (novelId, chapterData) => {
+    setIsLoading(true);
+    try {
+      if (chapterData.id) {
+        // 更新章节
+        await Chapter.update(chapterData.id, chapterData);
+        // addMessage("章节更新成功", "success"); // Removed as `addMessage` is not defined
+      } else {
+        // 创建新章节
+        await Chapter.create({ ...chapterData, novel_id: novelId });
+        // addMessage("章节创建成功", "success"); // Removed as `addMessage` is not defined
+      }
+
+      // 更新小说的content_updated_date为当前时间
+      await Novel.update(novelId, {
+        content_updated_date: new Date().toISOString()
+      });
+
+      // Refresh the list of novels to show updated content_updated_date
+      await loadUserAndNovels();
+      setEditingChapter(null); // Close the editor
+
+      // 刷新章节列表 for the selected novel
+      if (selectedNovelId === novelId) {
+        const updatedChapters = await Chapter.filter({ novel_id: novelId }, "chapter_number");
+        setChapters(prev => ({ ...prev, [novelId]: updatedChapters }));
+      }
+    } catch (error) {
+      console.error("保存章节时出错:", error);
+      // addMessage("保存章节失败: " + error.message, "error"); // Removed as `addMessage` is not defined
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const deleteChapter = async (chapterId) => {
     if (window.confirm("确定要删除这个章节吗？此操作无法撤销。")) {
+      setIsLoading(true);
       try {
+        if (!selectedNovelId) {
+            console.error("No novel selected when attempting to delete chapter.");
+            return;
+        }
+
         await Chapter.delete(chapterId);
-        handleChapterSave();
+        // Also update the novel's content_updated_date when a chapter is deleted
+        await Novel.update(selectedNovelId, { content_updated_date: new Date().toISOString() });
+        
+        // Refresh chapters for the currently selected novel
+        const novelChapters = await Chapter.filter({ novel_id: selectedNovelId }, "chapter_number");
+        setChapters(prev => ({ ...prev, [selectedNovelId]: novelChapters }));
+
+        // Refresh the entire novel list to update content_updated_date displayed
+        await loadUserAndNovels();
+
       } catch(error) {
         console.error("Failed to delete chapter", error);
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -165,7 +213,7 @@ export default function CreatorDashboardComponent() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold text-white">创作者中心</h2>
-        <Button className="bg-blue-600 hover:bg-blue-700"> 
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white"> 
           <PlusCircle className="mr-2 h-4 w-4" /> 
           创建新小说 
         </Button>
@@ -186,7 +234,7 @@ export default function CreatorDashboardComponent() {
                 <Button 
                   variant="outline" 
                   onClick={() => loadChapters(novel.id)}
-                  className="border-white/30 text-white hover:bg-white/10"
+                  className="border-white/30 text-white hover:bg-white/10 hover:text-white"
                 >
                   {selectedNovelId === novel.id ? "收起章节" : "管理章节"}
                 </Button>
@@ -207,7 +255,7 @@ export default function CreatorDashboardComponent() {
                           variant="ghost" 
                           size="sm" 
                           onClick={() => setEditingChapter(chap)}
-                          className="text-white/80 hover:text-white hover:bg-white/10"
+                          className="text-blue-300 hover:text-blue-200 hover:bg-blue-500/10"
                         >
                           <Edit className="w-4 h-4"/> 
                         </Button>
@@ -215,7 +263,7 @@ export default function CreatorDashboardComponent() {
                           variant="ghost" 
                           size="sm" 
                           onClick={() => deleteChapter(chap.id)} 
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          className="text-red-300 hover:text-red-200 hover:bg-red-500/10"
                         >
                           <Trash2 className="w-4 h-4"/> 
                         </Button>
@@ -223,8 +271,7 @@ export default function CreatorDashboardComponent() {
                     </div>
                   ))}
                   <Button 
-                    variant="secondary" 
-                    className="w-full bg-white/10 text-white hover:bg-white/20" 
+                    className="w-full bg-green-600 hover:bg-green-700 text-white" 
                     onClick={() => setEditingChapter({ novel_id: novel.id })}
                   >
                     <PlusCircle className="mr-2 h-4 w-4" /> 添加新章节

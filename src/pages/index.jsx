@@ -18,11 +18,13 @@ import CreatorDashboard from "./CreatorDashboard";
 
 import DataCleanup from "./DataCleanup";
 
-import BlockchainSync from "./BlockchainSync";
-
 import SchemaUpdate from "./SchemaUpdate";
 
 import Administrator from "./Administrator";
+
+import AuthorPage from "./AuthorPage";
+
+import ServerDiagnostic from "./ServerDiagnostic";
 
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -46,11 +48,13 @@ const PAGES = {
     
     DataCleanup: DataCleanup,
     
-    BlockchainSync: BlockchainSync,
-    
     SchemaUpdate: SchemaUpdate,
     
     Administrator: Administrator,
+    
+    AuthorPage: AuthorPage,
+    
+    ServerDiagnostic: ServerDiagnostic,
     
 }
 
@@ -97,11 +101,13 @@ function PagesContent() {
                 
                 <Route path="/DataCleanup" element={<DataCleanup />} />
                 
-                <Route path="/BlockchainSync" element={<BlockchainSync />} />
-                
                 <Route path="/SchemaUpdate" element={<SchemaUpdate />} />
                 
                 <Route path="/Administrator" element={<Administrator />} />
+                
+                <Route path="/AuthorPage" element={<AuthorPage />} />
+                
+                <Route path="/ServerDiagnostic" element={<ServerDiagnostic />} />
                 
             </Routes>
         </Layout>

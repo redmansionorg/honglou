@@ -7,3 +7,9 @@ export const syncChapters = base44.functions.syncChapters;
 
 export const updateSchema = base44.functions.updateSchema;
 
+export const getChapterCountFromChain = base44.functions.getChapterCountFromChain;
+
+export const syncAuthorProfiles = base44.functions.syncAuthorProfiles;
+
+export const getNovelChaptersForList = base44.functions.getNovelChaptersForList;
+

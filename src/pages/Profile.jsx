@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { User, ReadingProgress, Novel } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,26 +19,12 @@ export default function Profile() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
-    try {
-      const currentUser = await User.me();
-      setUser(currentUser);
-      if (currentUser) {
-        // Pass the created_date from currentUser to loadUserStats to ensure it's available and correct.
-        await loadUserStats(currentUser.id, currentUser.created_date);
-      }
-    } catch (error) {
-      console.log("User not authenticated");
-    }
-    setIsLoading(false);
-  };
-
   // Accept userCreatedDate as a parameter to ensure joinDate is correctly set from the fetched user data.
-  const loadUserStats = async (userId, userCreatedDate) => {
+  // This function is called by loadUser, so it doesn't need to be memoized with useCallback unless
+  // it's passed down to child components that depend on its referential equality.
+  // For the current use case, it's fine as a regular function or could be wrapped in useCallback
+  // if `loadUser` also depended on it being stable.
+  const loadUserStats = useCallback(async (userId, userCreatedDate) => {
     try {
       const [userProgress, allNovels] = await Promise.all([
         ReadingProgress.filter({ user_id: userId }),
@@ -59,7 +45,25 @@ export default function Profile() {
     } catch (error) {
       console.error("Error loading user stats:", error);
     }
-  };
+  }, []); // Empty dependency array as it doesn't depend on any external props/state that would change its logic.
+
+  const loadUser = useCallback(async () => {
+    try {
+      const currentUser = await User.me();
+      setUser(currentUser);
+      if (currentUser) {
+        // Pass the created_date from currentUser to loadUserStats to ensure it's available and correct.
+        await loadUserStats(currentUser.id, currentUser.created_date);
+      }
+    } catch (error) {
+      console.log("User not authenticated");
+    }
+    setIsLoading(false);
+  }, [loadUserStats]); // loadUser now depends on loadUserStats, so include it in dependencies.
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]); // Corrected: useEffect now depends on the memoized loadUser function.
 
   const handleLogout = async () => {
     await User.logout();
@@ -72,12 +76,12 @@ export default function Profile() {
         <Card className="p-8 text-center max-w-md">
           <CardContent className="space-y-4">
             <BookOpen className="w-16 h-16 text-amber-600 mx-auto" />
-            <h2 className="text-2xl font-bold text-slate-800">Join NovelReads</h2>
+            <h2 className="text-2xl font-bold text-slate-800">加入红楼小说</h2>
             <p className="text-slate-600">
-              Create your profile and start your reading journey
+              创建您的个人资料并开始您的阅读之旅
             </p>
             <Button onClick={() => User.loginWithRedirect(window.location.href)} className="bg-amber-500 hover:bg-amber-600 text-amber-900">
-              Sign In
+              登录
             </Button>
           </CardContent>
         </Card>
@@ -101,18 +105,18 @@ export default function Profile() {
 
               <div className="text-center md:text-left flex-1">
                 <h1 className="text-3xl font-bold text-slate-800 mb-2">
-                  {user.full_name || 'Reader'}
+                  {user.full_name || '读者'}
                 </h1>
                 <p className="text-slate-600 mb-4">{user.email}</p>
 
                 <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
                   <Badge className="bg-amber-100 text-amber-700 border-amber-200">
-                    {user.role === 'admin' ? 'Admin' : 'Reader'}
+                    {user.role === 'admin' ? '管理员' : '读者'}
                   </Badge>
                   {stats.joinDate && (
                     <div className="flex items-center gap-1 text-sm text-slate-500">
                       <Calendar className="w-4 h-4" />
-                      <span>Joined {format(new Date(stats.joinDate), "MMMM yyyy")}</span>
+                      <span>加入于 {format(new Date(stats.joinDate), "yyyy年M月")}</span>
                     </div>
                   )}
                 </div>
@@ -124,7 +128,7 @@ export default function Profile() {
                 className="flex items-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
-                Sign Out
+                退出登录
               </Button>
             </div>
           </CardContent>
@@ -140,7 +144,7 @@ export default function Profile() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 text-center">
-              <p className="text-sm text-slate-600">Novels in Library</p>
+              <p className="text-sm text-slate-600">书架中的小说</p>
             </CardContent>
           </Card>
 
@@ -152,7 +156,7 @@ export default function Profile() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 text-center">
-              <p className="text-sm text-slate-600">Completed</p>
+              <p className="text-sm text-slate-600">已完成</p>
             </CardContent>
           </Card>
 
@@ -164,7 +168,7 @@ export default function Profile() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 text-center">
-              <p className="text-sm text-slate-600">Favorites</p>
+              <p className="text-sm text-slate-600">收藏</p>
             </CardContent>
           </Card>
 
@@ -176,7 +180,7 @@ export default function Profile() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 text-center">
-              <p className="text-sm text-slate-600">Chapters Read</p>
+              <p className="text-sm text-slate-600">已读章节</p>
             </CardContent>
           </Card>
         </div>
@@ -186,7 +190,7 @@ export default function Profile() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-amber-500" />
-              Reading Achievements
+              阅读成就
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -199,8 +203,8 @@ export default function Profile() {
                     <BookOpen className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-slate-800">First Steps</h4>
-                    <p className="text-sm text-slate-600">Add your first novel</p>
+                    <h4 className="font-semibold text-slate-800">初次尝试</h4>
+                    <p className="text-sm text-slate-600">添加您的第一部小说</p>
                   </div>
                 </div>
               </div>
@@ -211,8 +215,8 @@ export default function Profile() {
                     <CheckCircle2 className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-slate-800">Completionist</h4>
-                    <p className="text-sm text-slate-600">Finish your first novel</p>
+                    <h4 className="font-semibold text-slate-800">完成主义者</h4>
+                    <p className="text-sm text-slate-600">完成您的第一部小说</p>
                   </div>
                 </div>
               </div>
@@ -223,8 +227,8 @@ export default function Profile() {
                     <Heart className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-slate-800">Favorites Collector</h4>
-                    <p className="text-sm text-slate-600">Mark 3 novels as favorites</p>
+                    <h4 className="font-semibold text-slate-800">收藏家</h4>
+                    <p className="text-sm text-slate-600">收藏 3 部小说</p>
                   </div>
                 </div>
               </div>
@@ -235,8 +239,8 @@ export default function Profile() {
                     <TrendingUp className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-slate-800">Chapter Master</h4>
-                    <p className="text-sm text-slate-600">Read 50 chapters total</p>
+                    <h4 className="font-semibold text-slate-800">章节大师</h4>
+                    <p className="text-sm text-slate-600">总共阅读 50 个章节</p>
                   </div>
                 </div>
               </div>

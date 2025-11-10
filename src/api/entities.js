@@ -13,6 +13,8 @@ export const Like = base44.entities.Like;
 
 export const Rating = base44.entities.Rating;
 
+export const AuthorProfile = base44.entities.AuthorProfile;
+
 
 
 // auth sdk:

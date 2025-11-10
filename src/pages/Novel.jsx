@@ -1,19 +1,19 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Novel } from "@/api/entities";
-import { Chapter } from "@/api/entities";
 import { ReadingProgress, User } from "@/api/entities";
-import { Comment } from "@/api/entities"; // Added import for Comment
+import { Comment } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { BookOpen, Star, Eye, Heart, Clock, ArrowLeft, Play, MessageCircle, Share2 } from "lucide-react";
+import { BookOpen, Star, Eye, Heart, Clock, Play, MessageCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import CommentModal from "../components/comments/CommentModal";
 import ShareButton from "../components/share/ShareButton";
 import RatingComponent from "../components/rating/RatingComponent";
+import { getNovelChaptersForList } from "@/api/functions";
+import { chapterListCacheManager } from "../components/utils/ChapterListCacheManager";
 
 export default function NovelPage() {
   const [novel, setNovel] = useState(null);
@@ -23,45 +23,14 @@ export default function NovelPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showComments, setShowComments] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [novelCommentCount, setNovelCommentCount] = useState(0); // 新增状态
-  const [novelRating, setNovelRating] = useState(0); // 新增：小说评分状态
+  const [novelCommentCount, setNovelCommentCount] = useState(0);
+  const [novelRating, setNovelRating] = useState(0);
   const navigate = useNavigate();
 
   const urlParams = new URLSearchParams(window.location.search);
   const novelId = urlParams.get('id');
 
-  useEffect(() => {
-    if (novelId) {
-      loadNovelData();
-      loadUser();
-    }
-  }, [novelId]);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    // 【关键修复】当用户切换回此页面时，自动重新加载阅读进度
-    const reloadProgressOnVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadUser();
-      }
-    };
-
-    document.addEventListener('visibilitychange', reloadProgressOnVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', reloadProgressOnVisibilityChange);
-    };
-  }, [novelId]); // 依赖 novelId 以确保 loadUser 在正确的上下文中被调用
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     try {
       const currentUser = await User.me();
       setUser(currentUser);
@@ -73,49 +42,59 @@ export default function NovelPage() {
         if (userProgress.length > 0) {
           setProgress(userProgress[0]);
         } else {
-          setProgress(null); // Explicitly set to null if no progress found
+          setProgress(null);
         }
       } else {
-        setProgress(null); // Clear progress if no user or novelId
+        setProgress(null);
       }
     } catch (error) {
       console.log("User not authenticated", error);
-      setUser(null); // Ensure user is null if not authenticated
-      setProgress(null); // Clear progress if user not authenticated
+      setUser(null);
+      setProgress(null);
     }
-  };
+  }, [novelId]);
 
-  const loadNovelData = async () => {
+  const loadNovelData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 加载所有小说，但检查是否已上架
-      const allNovels = await Novel.list();
-      const novelData = allNovels.find(n => n.id === novelId);
+      const novelDataResults = await Novel.filter({ id: novelId });
+      const novelData = novelDataResults.length > 0 ? novelDataResults[0] : null;
 
       if (novelData) {
-        // 检查小说是否已上架，如果未上架则不显示
-        // novelData.is_published 默认为 true 或 undefined（旧数据），需要显式检查 false
         if (novelData.is_published === false) {
           setNovel(null);
           setIsLoading(false);
           return;
         }
 
-        // 阅读数增加逻辑保持不变
         let updatedNovelData = { ...novelData };
         if (updatedNovelData.reads_count !== undefined) {
           const newReadsCount = (updatedNovelData.reads_count || 0) + 1;
-          await Novel.update(novelId, { reads_count: newReadsCount });
+          Novel.update(novelId, { reads_count: newReadsCount }).catch(err =>
+            console.error("Failed to update reads count:", err)
+          );
           updatedNovelData.reads_count = newReadsCount;
         }
         setNovel(updatedNovelData);
-        setNovelRating(updatedNovelData.rating || 0); // 设置评分状态
+        setNovelRating(updatedNovelData.rating || 0);
 
-        // 【关键修复】使用与 Reader 页面相同的 Chapter.filter 方法，这是最可靠的方案
-        const [novelChapters, comments] = await Promise.all([
-          Chapter.filter({ novel_id: novelId, published: true }, "chapter_number", 5000), // 直接筛选并排序
-          Comment.filter({ target_type: 'novel', target_id: novelId })
-        ]);
+        // 【关键优化】使用章节列表缓存和后端函数
+        let novelChapters = [];
+        const { chapters: cachedChapters, expired } = chapterListCacheManager.getChapters(novelId);
+
+        if (cachedChapters && !expired) {
+          novelChapters = cachedChapters;
+        } else {
+          const chapterResponse = await getNovelChaptersForList({ novel_id: novelId });
+          if (chapterResponse.data.success) {
+            novelChapters = chapterResponse.data.chapters;
+            chapterListCacheManager.setChapters(novelId, novelChapters);
+          } else {
+            console.error("Failed to fetch chapters from backend:", chapterResponse.data.error);
+          }
+        }
+        
+        const comments = await Comment.filter({ target_type: 'novel', target_id: novelId });
 
         setChapters(novelChapters);
         setNovelCommentCount(comments.length);
@@ -130,12 +109,41 @@ export default function NovelPage() {
       setNovelCommentCount(0);
     }
     setIsLoading(false);
-  };
+  }, [novelId]);
 
-  // 处理评分更新的回调
+  useEffect(() => {
+    if (novelId) {
+      loadNovelData();
+      loadUser();
+    }
+  }, [novelId, loadNovelData, loadUser]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    window.scrollTo(0, 0);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const reloadProgressOnVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadUser();
+      }
+    };
+
+    document.addEventListener('visibilitychange', reloadProgressOnVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', reloadProgressOnVisibilityChange);
+    };
+  }, [loadUser]);
+
   const handleRatingUpdate = (newRating, ratingCount) => {
     setNovelRating(newRating);
-    // 同时更新 novel 状态中的评分
     setNovel(prev => ({ ...prev, rating: newRating }));
   };
 
@@ -145,14 +153,12 @@ export default function NovelPage() {
     let chapterToReadNumber = 1;
 
     if (user) {
-      // 确保在操作前获取最新的进度
       const userProgress = await ReadingProgress.filter({ user_id: user.id, novel_id: novelId });
       let currentProgress = userProgress.length > 0 ? userProgress[0] : null;
 
       if (currentProgress) {
         chapterToReadNumber = currentProgress.current_chapter || 1;
       } else {
-        // 如果没有进度，为用户创建
         const newProgress = await ReadingProgress.create({
           user_id: user.id,
           novel_id: novelId,
@@ -161,17 +167,15 @@ export default function NovelPage() {
           last_read_date: new Date().toISOString(),
           reading_status: "reading"
         });
-        setProgress(newProgress); // 更新本地状态
+        setProgress(newProgress);
         chapterToReadNumber = 1;
       }
     }
 
     const targetChapter = chapters.find(c => c.chapter_number === chapterToReadNumber);
     if (targetChapter) {
-      // 直接导航，不附加任何位置参数
       navigate(createPageUrl(`Reader?novelId=${novelId}&chapterId=${targetChapter.id}`));
     } else if (chapters.length > 0) {
-      // 如果找不到目标章节（例如数据错误），则导航到第一章
       navigate(createPageUrl(`Reader?novelId=${novelId}&chapterId=${chapters[0].id}`));
     }
   };
@@ -314,7 +318,20 @@ export default function NovelPage() {
               <h1 className="text-3xl md:text-4xl font-bold text-slate-800 leading-tight">
                 {novel.title}
               </h1>
-              <p className="text-xl text-slate-600">作者：{novel.author}</p>
+
+              <p className="text-xl text-slate-600">
+                作者：
+                {novel.bc_author_address ? (
+                  <Link
+                    to={createPageUrl(`AuthorPage?address=${novel.bc_author_address}`)}
+                    className="text-amber-600 hover:text-amber-700 hover:underline font-medium ml-1 transition-colors duration-200"
+                  >
+                    {novel.author}
+                  </Link>
+                ) : (
+                  <span className="ml-1">{novel.author}</span>
+                )}
+              </p>
             </div>
 
             <div className="flex items-center gap-6 text-slate-600 flex-wrap">
@@ -332,7 +349,7 @@ export default function NovelPage() {
                 <BookOpen className="w-4 h-4" />
                 <span>{chapters.length} 章节</span>
               </div>
-              {progress && user && ( // Only show progress if user is logged in
+              {progress && user && (
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   <span>{Math.round(progress.progress_percentage)}% 完成</span>
@@ -362,7 +379,6 @@ export default function NovelPage() {
           </div>
         </div>
 
-        {/* Rating Component - 在章节列表之前添加 */}
         <RatingComponent
           novelId={novelId}
           currentRating={novelRating}
@@ -404,7 +420,6 @@ export default function NovelPage() {
                           )}
                         </div>
                       </div>
-                      {/* 清理后的当前章节显示逻辑 */}
                       {progress?.current_chapter && parseInt(progress.current_chapter) === parseInt(chapter.chapter_number) && user && (
                         <Badge className="bg-amber-100 text-amber-700">
                           当前
@@ -420,7 +435,6 @@ export default function NovelPage() {
         </Card>
       </div>
 
-      {/* Comment Modal - Moved to the correct position */}
       <CommentModal
         isOpen={showComments}
         onClose={() => setShowComments(false)}

@@ -1,10 +1,11 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { User as UserEntity } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, User } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { LogOut, User, Shield } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -68,6 +69,17 @@ export default function DesktopNavbar({ user, onLogout, isLoadingUser }) {
                         <span>我的</span>
                       </Link>
                     </DropdownMenuItem>
+                    {user.role === 'admin' && (
+                      <DropdownMenuItem asChild>
+                        <Link to={createPageUrl("Administrator")}>
+                          <Shield className="mr-2 h-4 w-4" />
+                          <span>后台管理</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    {user.role === 'admin' && (
+                      <DropdownMenuSeparator />
+                    )}
                     <DropdownMenuItem onClick={onLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>退出登录</span>

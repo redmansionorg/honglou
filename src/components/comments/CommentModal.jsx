@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Comment, Like, User } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,36 +28,7 @@ export default function CommentModal({
 
   const storageKey = `comment-draft-${targetId}-${paragraphIndex ?? 'root'}`;
 
-  useEffect(() => {
-    if (isOpen) {
-      loadUser();
-      loadComments();
-      const savedDraft = localStorage.getItem(storageKey);
-      if (savedDraft) {
-        setNewComment(savedDraft);
-      }
-    } else {
-      setNewComment(""); // Clear input when closed
-    }
-  }, [isOpen, targetId, targetType, paragraphIndex, storageKey]);
-
-  // Click outside to close
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (modalRef.current && !modalRef.current.contains(event.target)) {
-        onClose();
-      }
-    }
-    if (isOpen && !isMobile) { // Only enable click outside close for desktop
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isOpen, onClose, isMobile]);
-
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     try {
       const currentUser = await User.me();
       setUser(currentUser);
@@ -68,9 +39,9 @@ export default function CommentModal({
     } catch (error) {
       console.log("User not authenticated");
     }
-  };
+  }, []); // Dependencies for loadUser: setUser and setUserLikes are state setters, User.me and Like.filter are imported functions/objects assumed stable.
 
-  const loadComments = async () => {
+  const loadComments = useCallback(async () => {
     setIsLoading(true);
     try {
       const filter = {
@@ -87,7 +58,36 @@ export default function CommentModal({
       console.error("Error loading comments:", error);
     }
     setIsLoading(false);
-  };
+  }, [targetId, targetType, paragraphIndex]); // Dependencies for loadComments: targetId, targetType, paragraphIndex are props, setIsLoading and setComments are state setters.
+
+  useEffect(() => {
+    if (isOpen) {
+      loadUser();
+      loadComments();
+      const savedDraft = localStorage.getItem(storageKey);
+      if (savedDraft) {
+        setNewComment(savedDraft);
+      }
+    } else {
+      setNewComment(""); // Clear input when closed
+    }
+  }, [isOpen, storageKey, loadUser, loadComments]); // Updated dependencies to include the stable memoized functions
+
+  // Click outside to close
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (modalRef.current && !modalRef.current.contains(event.target)) {
+        onClose();
+      }
+    }
+    if (isOpen && !isMobile) { // Only enable click outside close for desktop
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, onClose, isMobile]);
+
 
   const handleSubmitComment = async () => {
     if (!user) {
@@ -178,6 +178,14 @@ export default function CommentModal({
     localStorage.setItem(storageKey, e.target.value);
   }
 
+  // 【修复】处理键盘事件，只在 Ctrl/Cmd + Enter 时提交
+  const handleKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault(); // 防止默认行为（如换行）
+      handleSubmitComment();
+    }
+  };
+
   const modalClasses = isMobile 
     ? "fixed inset-0 z-50 bg-white"
     : "fixed right-0 top-0 h-full w-96 bg-white shadow-2xl z-50 border-l";
@@ -261,9 +269,10 @@ export default function CommentModal({
           
           <div className="flex gap-2">
             <Textarea
-              placeholder={replyingTo ? "写下你的回复..." : "写下你的想法..."}
+              placeholder={replyingTo ? "写下你的回复... (Cmd/Ctrl+Enter 快捷发送)" : "写下你的想法... (Cmd/Ctrl+Enter 快捷发送)"}
               value={newComment}
               onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
               className="flex-1 min-h-[60px] resize-none"
             />
             <Button 

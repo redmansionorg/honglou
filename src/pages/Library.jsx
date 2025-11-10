@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ReadingProgress, Novel, User } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,39 +17,21 @@ export default function Library() {
   const [novels, setNovels] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
-    try {
-      const currentUser = await User.me();
-      setUser(currentUser);
-      if (currentUser) {
-        await loadLibrary(currentUser.id);
-      }
-    } catch (error) {
-      console.log("User not authenticated");
-      setIsLoading(false);
-    }
-  };
-
-  const loadLibrary = async (userId) => {
+  // 【修复】使用 useCallback 包装 loadLibrary，并提供空的依赖数组
+  // 因为它内部使用的 setIsloading, setProgress, setNovels 是稳定的，不需要作为依赖
+  const loadLibrary = useCallback(async (userId) => {
     setIsLoading(true);
     try {
       const [userProgress, allNovels] = await Promise.all([
         ReadingProgress.filter({ user_id: userId }),
-        // 只加载已上架的小说
         Novel.filter({ is_published: true })
       ]);
       
       setProgress(userProgress);
       
-      // Get novels that user has progress on and are published
       const novelIds = userProgress.map(p => p.novel_id);
       const userNovels = allNovels.filter(novel => novelIds.includes(novel.id));
       
-      // Attach progress data to novels
       const novelsWithProgress = userNovels.map(novel => {
         const novelProgress = userProgress.find(p => p.novel_id === novel.id);
         return { ...novel, progress: novelProgress };
@@ -60,7 +42,24 @@ export default function Library() {
       console.error("Error loading library:", error);
     }
     setIsLoading(false);
-  };
+  }, []); // 空依赖数组确保此函数引用稳定
+
+  const loadUser = useCallback(async () => {
+    try {
+      const currentUser = await User.me();
+      setUser(currentUser);
+      if (currentUser) {
+        await loadLibrary(currentUser.id); 
+      }
+    } catch (error) {
+      console.log("User not authenticated");
+      setIsLoading(false);
+    }
+  }, [loadLibrary]); // 现在 loadLibrary 是一个稳定的依赖
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]); // loadUser 现在也是稳定的，effect 只会运行一次
 
   const getNovelsByStatus = (status) => {
     return novels.filter(novel => novel.progress?.reading_status === status);
@@ -76,12 +75,12 @@ export default function Library() {
         <Card className="p-8 text-center max-w-md">
           <CardContent className="space-y-4">
             <BookOpen className="w-16 h-16 text-amber-600 mx-auto" />
-            <h2 className="text-2xl font-bold text-slate-800">Join NovelReads</h2>
+            <h2 className="text-2xl font-bold text-slate-800">加入红楼小说</h2>
             <p className="text-slate-600">
-              Create your personal library and track your reading progress
+              创建您的个人书架并追踪您的阅读进度
             </p>
             <Button onClick={() => User.loginWithRedirect(window.location.href)} className="bg-amber-500 hover:bg-amber-600 text-amber-900">
-              Sign In to Continue
+              登录继续
             </Button>
           </CardContent>
         </Card>
@@ -96,10 +95,10 @@ export default function Library() {
         {/* Header */}
         <div className="text-center space-y-4">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-800">
-            My Library
+            我的书架
           </h1>
           <p className="text-slate-600 max-w-2xl mx-auto">
-            Keep track of your reading journey and discover your next favorite story
+            记录您的阅读旅程，发现您的下一个最爱故事
           </p>
         </div>
 
@@ -109,7 +108,7 @@ export default function Library() {
             <CardContent className="p-4 text-center">
               <BookOpen className="w-8 h-8 text-blue-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-slate-800">{getNovelsByStatus('reading').length}</p>
-              <p className="text-sm text-slate-600">Currently Reading</p>
+              <p className="text-sm text-slate-600">正在阅读</p>
             </CardContent>
           </Card>
           
@@ -117,7 +116,7 @@ export default function Library() {
             <CardContent className="p-4 text-center">
               <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-slate-800">{getNovelsByStatus('completed').length}</p>
-              <p className="text-sm text-slate-600">Completed</p>
+              <p className="text-sm text-slate-600">已完成</p>
             </CardContent>
           </Card>
           
@@ -125,7 +124,7 @@ export default function Library() {
             <CardContent className="p-4 text-center">
               <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-slate-800">{getNovelsByStatus('plan-to-read').length}</p>
-              <p className="text-sm text-slate-600">Plan to Read</p>
+              <p className="text-sm text-slate-600">计划阅读</p>
             </CardContent>
           </Card>
           
@@ -133,7 +132,7 @@ export default function Library() {
             <CardContent className="p-4 text-center">
               <Heart className="w-8 h-8 text-pink-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-slate-800">{getFavorites().length}</p>
-              <p className="text-sm text-slate-600">Favorites</p>
+              <p className="text-sm text-slate-600">收藏</p>
             </CardContent>
           </Card>
         </div>
@@ -141,11 +140,11 @@ export default function Library() {
         {/* Library Content */}
         <Tabs defaultValue="reading" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 bg-white/80">
-            <TabsTrigger value="reading">Reading</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-            <TabsTrigger value="plan-to-read">Plan to Read</TabsTrigger>
-            <TabsTrigger value="favorites">Favorites</TabsTrigger>
-            <TabsTrigger value="dropped">Dropped</TabsTrigger>
+            <TabsTrigger value="reading">阅读中</TabsTrigger>
+            <TabsTrigger value="completed">已完成</TabsTrigger>
+            <TabsTrigger value="plan-to-read">计划阅读</TabsTrigger>
+            <TabsTrigger value="favorites">收藏</TabsTrigger>
+            <TabsTrigger value="dropped">已放弃</TabsTrigger>
           </TabsList>
 
           <TabsContent value="reading" className="space-y-6">
@@ -166,7 +165,7 @@ export default function Library() {
                     <NovelCard novel={novel} />
                     <div className="px-2">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-slate-600">Progress</span>
+                        <span className="text-sm text-slate-600">阅读进度</span>
                         <span className="text-sm font-medium text-slate-800">
                           {Math.round(novel.progress.progress_percentage)}%
                         </span>
@@ -178,7 +177,7 @@ export default function Library() {
                         ></div>
                       </div>
                       <p className="text-xs text-slate-500 mt-1">
-                        Chapter {novel.progress.current_chapter}
+                        第 {novel.progress.current_chapter} 章
                       </p>
                     </div>
                   </div>
@@ -187,12 +186,12 @@ export default function Library() {
             ) : (
               <EmptyState 
                 icon={BookOpen}
-                title="No novels in progress"
-                description="Start reading a novel to see it here"
+                title="暂无正在阅读的小说"
+                description="开始阅读一部小说来在这里查看它"
                 action={
                   <Link to={createPageUrl("Home")}>
                     <Button className="bg-amber-500 hover:bg-amber-600 text-amber-900">
-                      Discover Novels
+                      发现小说
                     </Button>
                   </Link>
                 }
@@ -206,7 +205,7 @@ export default function Library() {
                 {getNovelsByStatus('completed').map((novel) => (
                   <div key={novel.id} className="relative">
                     <Badge className="absolute -top-2 -right-2 z-10 bg-green-500 text-white">
-                      Completed
+                      已完成
                     </Badge>
                     <NovelCard novel={novel} />
                   </div>
@@ -215,8 +214,8 @@ export default function Library() {
             ) : (
               <EmptyState 
                 icon={CheckCircle2}
-                title="No completed novels"
-                description="Finished novels will appear here"
+                title="暂无已完成的小说"
+                description="完成阅读的小说将出现在这里"
               />
             )}
           </TabsContent>
@@ -231,8 +230,8 @@ export default function Library() {
             ) : (
               <EmptyState 
                 icon={Clock}
-                title="No novels planned"
-                description="Add novels to your reading list to see them here"
+                title="暂无计划阅读的小说"
+                description="添加小说到您的阅读列表来在这里查看"
               />
             )}
           </TabsContent>
@@ -250,8 +249,8 @@ export default function Library() {
             ) : (
               <EmptyState 
                 icon={Heart}
-                title="No favorite novels"
-                description="Mark novels as favorites to see them here"
+                title="暂无收藏的小说"
+                description="收藏的小说将出现在这里"
               />
             )}
           </TabsContent>
@@ -266,8 +265,8 @@ export default function Library() {
             ) : (
               <EmptyState 
                 icon={AlertCircle}
-                title="No dropped novels"
-                description="Novels you've stopped reading will appear here"
+                title="暂无放弃的小说"
+                description="您停止阅读的小说将出现在这里"
               />
             )}
           </TabsContent>

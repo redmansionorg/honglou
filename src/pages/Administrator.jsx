@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { User } from "@/api/entities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,13 +14,15 @@ import {
   Wrench,
   User as UserIcon,
   LogOut,
-  AlertTriangle
+  AlertTriangle,
+  Users // 新增导入 Users icon
 } from "lucide-react";
 
 // 导入所有管理组件
 import CreatorDashboardComponent from "../components/admin/CreatorDashboardComponent";
 import DataCleanupComponent from "../components/admin/DataCleanupComponent";
 import BlockchainSyncComponent from "../components/admin/BlockchainSyncComponent";
+import AuthorSyncComponent from "../components/admin/AuthorSyncComponent"; // 新增导入 AuthorSyncComponent
 import SchemaUpdateComponent from "../components/admin/SchemaUpdateComponent";
 import DebugComponent from "../components/admin/DebugComponent";
 
@@ -35,10 +38,17 @@ const adminTabs = [
   },
   {
     id: "blockchain",
-    label: "区块链同步",
+    label: "小说同步", // 修改标签为“小说同步”
     icon: LinkIcon,
-    description: "同步区块链上的小说数据",
+    description: "同步区块链上的小说和章节数据", // 修改描述
     component: BlockchainSyncComponent
+  },
+  {
+    id: "author-sync", // 新增作者同步标签页
+    label: "作者同步",
+    icon: Users,
+    description: "同步区块链上的作者简介信息",
+    component: AuthorSyncComponent
   },
   {
     id: "schema",
@@ -153,7 +163,7 @@ export default function Administrator() {
   }
 
   // 管理员界面
-  const ActiveComponent = adminTabs.find(tab => tab.id === activeTab)?.component;
+  // const ActiveComponent = adminTabs.find(tab => tab.id === activeTab)?.component; // This line is not needed here anymore
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
@@ -194,7 +204,8 @@ export default function Administrator() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           {/* 标签页导航 */}
-          <TabsList className="grid w-full grid-cols-5 bg-black/20 backdrop-blur-md border-white/10">
+          {/* 更新 grid-cols-5 为 grid-cols-6 以适应新增标签页 */}
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 bg-black/20 backdrop-blur-md border-white/10">
             {adminTabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -231,7 +242,8 @@ export default function Administrator() {
 
               {/* 功能组件 */}
               <div className="bg-white/5 backdrop-blur-md rounded-lg border border-white/10 p-6">
-                {ActiveComponent && <ActiveComponent />}
+                {/* 仅当当前tab活跃时渲染其组件 */}
+                {activeTab === tab.id && tab.component && <tab.component />}
               </div>
             </TabsContent>
           ))}

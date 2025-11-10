@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Novel } from "@/api/entities";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,8 @@ import { Search, Filter, Star, TrendingUp } from "lucide-react";
 import NovelCard from "../components/novels/NovelCard";
 
 const genres = [
-  'romance', 'fantasy', 'mystery', 'sci-fi', 'drama', 
-  'thriller', 'adventure', 'historical', 'young-adult', 'other'
+  '玄幻·奇幻', '都市·现实', '仙侠·武侠', '历史·军事', '科幻·游戏', 
+  '悬疑·惊悚', '古代言情', '现代言情', '二次元·衍生', '其他分类'
 ];
 
 const statuses = ['ongoing', 'completed', 'hiatus'];
@@ -28,18 +28,7 @@ export default function Browse() {
   const urlParams = new URLSearchParams(window.location.search);
   const initialGenre = urlParams.get('genre') || 'all';
 
-  useEffect(() => {
-    loadNovels();
-    if (initialGenre !== 'all') {
-      setSelectedGenre(initialGenre);
-    }
-  }, []);
-
-  useEffect(() => {
-    filterAndSortNovels();
-  }, [novels, searchQuery, selectedGenre, selectedStatus, sortBy]);
-
-  const loadNovels = async () => {
+  const loadNovels = useCallback(async () => {
     setIsLoading(true);
     try {
       // 只加载已上架的小说
@@ -49,9 +38,9 @@ export default function Browse() {
       console.error("Error loading novels:", error);
     }
     setIsLoading(false);
-  };
+  }, []); // Empty dependency array as it doesn't depend on any props or state that would change its behavior
 
-  const filterAndSortNovels = () => {
+  const filterAndSortNovels = useCallback(() => {
     let filtered = [...novels];
 
     // Search filter
@@ -90,7 +79,18 @@ export default function Browse() {
     });
 
     setFilteredNovels(filtered);
-  };
+  }, [novels, searchQuery, selectedGenre, selectedStatus, sortBy]); // Dependencies for filterAndSortNovels
+
+  useEffect(() => {
+    loadNovels();
+    if (initialGenre !== 'all') {
+      setSelectedGenre(initialGenre);
+    }
+  }, [loadNovels, initialGenre]); // Depend on memoized loadNovels and initialGenre
+
+  useEffect(() => {
+    filterAndSortNovels();
+  }, [filterAndSortNovels]); // Depend on memoized filterAndSortNovels
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -106,10 +106,10 @@ export default function Browse() {
         {/* Header */}
         <div className="text-center space-y-4">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-800">
-            Browse Novels
+            浏览小说
           </h1>
           <p className="text-slate-600 max-w-2xl mx-auto">
-            Discover your next favorite story from our collection
+            从我们的收藏中发现您下一个最喜欢的故事
           </p>
         </div>
 
@@ -117,9 +117,9 @@ export default function Browse() {
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-slate-200/60 space-y-4">
           <div className="flex items-center gap-3 mb-4">
             <Filter className="w-5 h-5 text-slate-600" />
-            <h2 className="text-lg font-semibold text-slate-800">Filters</h2>
+            <h2 className="text-lg font-semibold text-slate-800">筛选</h2>
             <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto">
-              Clear All
+              清除全部
             </Button>
           </div>
           
@@ -128,7 +128,7 @@ export default function Browse() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search novels..."
+                placeholder="搜索小说..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -138,13 +138,13 @@ export default function Browse() {
             {/* Genre Filter */}
             <Select value={selectedGenre} onValueChange={setSelectedGenre}>
               <SelectTrigger>
-                <SelectValue placeholder="All Genres" />
+                <SelectValue placeholder="全部分类" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Genres</SelectItem>
+                <SelectItem value="all">全部分类</SelectItem>
                 {genres.map(genre => (
                   <SelectItem key={genre} value={genre}>
-                    {genre.charAt(0).toUpperCase() + genre.slice(1).replace('-', ' ')}
+                    {genre}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -153,38 +153,36 @@ export default function Browse() {
             {/* Status Filter */}
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger>
-                <SelectValue placeholder="All Status" />
+                <SelectValue placeholder="全部状态" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                {statuses.map(status => (
-                  <SelectItem key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">全部状态</SelectItem>
+                <SelectItem value="ongoing">连载中</SelectItem>
+                <SelectItem value="completed">已完结</SelectItem>
+                <SelectItem value="hiatus">暂停</SelectItem>
               </SelectContent>
             </Select>
 
             {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger>
-                <SelectValue placeholder="Sort by" />
+                <SelectValue placeholder="排序方式" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="reads_count">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="w-4 h-4" />
-                    Most Popular
+                    最受欢迎
                   </div>
                 </SelectItem>
                 <SelectItem value="rating">
                   <div className="flex items-center gap-2">
                     <Star className="w-4 h-4" />
-                    Highest Rated
+                    评分最高
                   </div>
                 </SelectItem>
-                <SelectItem value="created_date">Recently Added</SelectItem>
-                <SelectItem value="title">Title (A-Z)</SelectItem>
+                <SelectItem value="created_date">最新添加</SelectItem>
+                <SelectItem value="title">标题 (A-Z)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -193,17 +191,17 @@ export default function Browse() {
           <div className="flex flex-wrap gap-2">
             {searchQuery && (
               <Badge variant="outline" className="bg-amber-50 text-amber-700">
-                Search: "{searchQuery}"
+                搜索: "{searchQuery}"
               </Badge>
             )}
             {selectedGenre !== 'all' && (
               <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                Genre: {selectedGenre.charAt(0).toUpperCase() + selectedGenre.slice(1)}
+                分类: {selectedGenre}
               </Badge>
             )}
             {selectedStatus !== 'all' && (
               <Badge variant="outline" className="bg-green-50 text-green-700">
-                Status: {selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)}
+                状态: {selectedStatus === 'ongoing' ? '连载中' : selectedStatus === 'completed' ? '已完结' : '暂停'}
               </Badge>
             )}
           </div>
@@ -213,7 +211,7 @@ export default function Browse() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-slate-800">
-              {isLoading ? 'Loading...' : `${filteredNovels.length} novels found`}
+              {isLoading ? '加载中...' : `找到 ${filteredNovels.length} 部小说`}
             </h3>
           </div>
 
@@ -236,12 +234,12 @@ export default function Browse() {
           ) : (
             <div className="text-center py-12">
               <Search className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-slate-800 mb-2">No novels found</h3>
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">未找到小说</h3>
               <p className="text-slate-600 mb-6">
-                Try adjusting your filters or search terms
+                尝试调整您的筛选条件或搜索关键词
               </p>
               <Button onClick={clearFilters} variant="outline">
-                Clear Filters
+                清除筛选
               </Button>
             </div>
           )}

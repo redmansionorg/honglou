@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Novel } from "@/api/entities";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -11,15 +11,60 @@ import { createPageUrl } from "@/utils";
 import NovelCard from "../components/novels/NovelCard";
 
 export default function Home() {
-  const [novels, setNovels] = useState([]);
+  const [recentNovels, setRecentNovels] = useState([]);
+  const [trendingNovels, setTrendingNovels] = useState([]);
   const [featuredNovels, setFeaturedNovels] = useState([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const slideInterval = useRef(null);
 
-  useEffect(() => {
-    loadNovels();
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // 【优化】一次性获取更多数据，然后在前端进行不同维度的排序和切片
+      // 获取足够多的已发布小说，例如20本，按创建日期倒序（作为初始数据源）
+      const allNovels = await Novel.filter({ is_published: true }, "-created_date", 20);
+
+      // 前端排序：按 content_updated_date 或 created_date 排序（用于"最近更新"）
+      const sortedByUpdate = [...allNovels].sort((a, b) => {
+        const aTime = a.content_updated_date || a.created_date;
+        const bTime = b.content_updated_date || b.created_date;
+        return new Date(bTime).getTime() - new Date(aTime).getTime(); // Descending order
+      });
+
+      // 前端排序：按 reads_count 排序（用于"热门推荐"）
+      const sortedByReads = [...allNovels].sort((a, b) => {
+        return (b.reads_count || 0) - (a.reads_count || 0); // Descending order
+      });
+
+      setRecentNovels(sortedByUpdate.slice(0, 8));
+      setTrendingNovels(sortedByReads.slice(0, 8));
+
+      // 使用最近更新的数据来填充顶部轮播 (取前3个)
+      if (sortedByUpdate.length > 0) {
+        setFeaturedNovels(sortedByUpdate.slice(0, 3));
+      }
+    } catch (error) {
+      console.error("Error loading home page data:", error);
+    }
+    setIsLoading(false);
   }, []);
+
+  const startAutoSlide = useCallback(() => {
+    if (slideInterval.current) {
+      clearInterval(slideInterval.current);
+    }
+    slideInterval.current = setInterval(() => {
+      // 使用 featuredNovels.length 确保安全
+      if (featuredNovels.length > 0) {
+        setCurrentSlide(prev => (prev + 1) % featuredNovels.length);
+      }
+    }, 5000);
+  }, [featuredNovels.length]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     if (featuredNovels.length > 0) {
@@ -30,31 +75,7 @@ export default function Home() {
         clearInterval(slideInterval.current);
       }
     };
-  }, [featuredNovels]);
-
-  const loadNovels = async () => {
-    setIsLoading(true);
-    try {
-      // 只加载已上架的小说
-      const allNovels = await Novel.filter({ is_published: true }, "-updated_date", 20);
-      setNovels(allNovels);
-      if (allNovels.length > 0) {
-        setFeaturedNovels(allNovels.slice(0, 3));
-      }
-    } catch (error) {
-      console.error("Error loading novels:", error);
-    }
-    setIsLoading(false);
-  };
-
-  const startAutoSlide = () => {
-    if (slideInterval.current) {
-      clearInterval(slideInterval.current);
-    }
-    slideInterval.current = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % featuredNovels.length);
-    }, 5000);
-  };
+  }, [featuredNovels, startAutoSlide]);
 
   const goToSlide = (index) => {
     setCurrentSlide(index);
@@ -70,10 +91,6 @@ export default function Home() {
     setCurrentSlide(prev => (prev + 1) % featuredNovels.length);
     startAutoSlide();
   };
-
-  // 修复数据分配逻辑
-  const trendingNovels = novels.slice(0, 8);
-  const recentNovels = novels.slice(0, 8); // 使用相同的小说列表，因为已经按更新时间排序
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-amber-50">
@@ -262,7 +279,7 @@ export default function Home() {
           
           <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
             {['言情', '玄幻', '悬疑', '科幻', '剧情'].map((genre, index) => {
-              const genreMap = { '言情': 'romance', '玄幻': 'fantasy', '悬疑': 'mystery', '科幻': 'sci-fi', '剧情': 'drama' };
+              const genreMap = { '言情': '古代言情', '玄幻': '玄幻·奇幻', '悬疑': '悬疑·惊悚', '科幻': '科幻·游戏', '剧情': '都市·现实' };
               return (
                 <Link key={genre} to={createPageUrl(`Browse?genre=${genreMap[genre]}`)} className="group">
                   <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-lg p-4 text-center hover:shadow-lg hover:border-amber-200 transition-all duration-300 group-hover:-translate-y-0.5">

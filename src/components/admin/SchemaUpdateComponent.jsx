@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { updateSchema } from "@/api/functions";
 import { Button } from "@/components/ui/button";
@@ -44,8 +45,8 @@ export default function SchemaUpdateComponent() {
           <div className="text-white/80">
             <p className="mb-2">此工具用于更新数据库结构，主要功能包括：</p>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>为现有小说记录添加 <code className="bg-white/10 px-1 rounded">is_published</code> 字段</li>
-              <li>设置默认值为 <code className="bg-white/10 px-1 rounded">true</code>（上架状态）</li>
+              <li>为现有小说记录添加 <code className="bg-white/10 px-1 rounded text-amber-300">is_published</code> 字段</li>
+              <li>设置默认值为 <code className="bg-white/10 px-1 rounded text-amber-300">true</code>（上架状态）</li>
               <li>确保所有小说在前端正常显示</li>
             </ul>
           </div>
@@ -53,7 +54,7 @@ export default function SchemaUpdateComponent() {
           <Button 
             onClick={handleSchemaUpdate}
             disabled={isUpdating}
-            className="w-full bg-blue-600 hover:bg-blue-700"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
             size="lg"
           >
             {isUpdating ? (
