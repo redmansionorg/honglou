@@ -8,7 +8,7 @@ import { TrendingUp, Clock, Star, Flame, Play, ChevronLeft, ChevronRight, BookOp
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
-import NovelCard from "../components/novels/NovelCard";
+import NovelCard from "@/components/novels/NovelCard";
 
 export default function Home() {
   const [recentNovels, setRecentNovels] = useState([]);

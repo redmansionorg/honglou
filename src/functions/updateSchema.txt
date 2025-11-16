@@ -1,0 +1,93 @@
+import { createClient } from 'npm:@base44/sdk@0.1.0';
+
+Deno.serve(async (req) => {
+    try {
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+            return new Response(JSON.stringify({ error: "未授权" }), { status: 401 });
+        }
+
+        const base44 = createClient({ appId: Deno.env.get('BASE44_APP_ID') });
+        base44.auth.setToken(authHeader.split(' ')[1]);
+        await base44.auth.me();
+
+        // 获取现有的小说数据 - 限制数量避免超时
+        const novels = await base44.entities.Novel.list(null, 50); // 限制50条
+        console.log(`找到 ${novels.length} 本小说`);
+
+        if (novels.length === 0) {
+            return new Response(JSON.stringify({
+                success: true,
+                message: "没有找到需要更新的小说记录",
+                totalNovels: 0,
+                updatedNovels: 0
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+
+        // 检查需要更新的小说
+        const novelsToUpdate = novels.filter(novel => novel.is_published === undefined);
+        console.log(`需要更新 ${novelsToUpdate.length} 本小说`);
+
+        if (novelsToUpdate.length === 0) {
+            return new Response(JSON.stringify({
+                success: true,
+                message: "所有小说都已经有上架状态字段，无需更新",
+                totalNovels: novels.length,
+                updatedNovels: 0
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+
+        // 批量更新 - 每次处理5条记录
+        let updatedCount = 0;
+        const batchSize = 5;
+        
+        for (let i = 0; i < novelsToUpdate.length; i += batchSize) {
+            const batch = novelsToUpdate.slice(i, i + batchSize);
+            
+            // 并行处理批次
+            const updatePromises = batch.map(async (novel) => {
+                try {
+                    await base44.entities.Novel.update(novel.id, {
+                        is_published: true // 默认设为上架状态
+                    });
+                    console.log(`更新小说: ${novel.title}`);
+                    return true;
+                } catch (error) {
+                    console.error(`更新小说 ${novel.title} 失败:`, error);
+                    return false;
+                }
+            });
+
+            const results = await Promise.allSettled(updatePromises);
+            updatedCount += results.filter(result => 
+                result.status === 'fulfilled' && result.value
+            ).length;
+
+            // 小延迟避免过载
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        return new Response(JSON.stringify({
+            success: true,
+            message: `成功为 ${updatedCount} 本小说添加上架状态字段（默认为上架状态）`,
+            totalNovels: novels.length,
+            updatedNovels: updatedCount
+        }), {
+            headers: { "Content-Type": "application/json" }
+        });
+
+    } catch (error) {
+        console.error('Schema 更新错误:', error);
+        return new Response(JSON.stringify({
+            error: error.message,
+            details: "更新数据库字段时发生错误"
+        }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+        });
+    }
+});

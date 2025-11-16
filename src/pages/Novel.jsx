@@ -9,11 +9,11 @@ import { Separator } from "@/components/ui/separator";
 import { BookOpen, Star, Eye, Heart, Clock, Play, MessageCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import CommentModal from "../components/comments/CommentModal";
-import ShareButton from "../components/share/ShareButton";
-import RatingComponent from "../components/rating/RatingComponent";
+import CommentModal from "@/components/comments/CommentModal";
+import ShareButton from "@/components/share/ShareButton";
+import RatingComponent from "@/components/rating/RatingComponent";
 import { getNovelChaptersForList } from "@/api/functions";
-import { chapterListCacheManager } from "../components/utils/ChapterListCacheManager";
+import { chapterListCacheManager } from "@/components/utils/ChapterListCacheManager";
 
 export default function NovelPage() {
   const [novel, setNovel] = useState(null);

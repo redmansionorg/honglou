@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter, Star, TrendingUp } from "lucide-react";
 
-import NovelCard from "../components/novels/NovelCard";
+import NovelCard from "@/components/novels/NovelCard";
 
 const genres = [
   '玄幻·奇幻', '都市·现实', '仙侠·武侠', '历史·军事', '科幻·游戏', 

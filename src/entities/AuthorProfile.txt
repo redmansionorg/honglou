@@ -1,0 +1,93 @@
+{
+  "name": "AuthorProfile",
+  "type": "object",
+  "properties": {
+    "bc_address": {
+      "type": "string",
+      "description": "作者的区块链地址，作为唯一标识符"
+    },
+    "pseudonym": {
+      "type": "string",
+      "description": "作者笔名"
+    },
+    "email": {
+      "type": "string",
+      "description": "作者邮箱"
+    },
+    "bio": {
+      "type": "string",
+      "description": "作者简介"
+    },
+    "avatar_url": {
+      "type": "string",
+      "description": "头像图片URL"
+    },
+    "cover_url": {
+      "type": "string",
+      "description": "背景图片URL"
+    },
+    "external_url": {
+      "type": "string",
+      "description": "作者外部链接"
+    },
+    "bc_metadata_cid": {
+      "type": "string",
+      "description": "IPFS上的元数据CID"
+    },
+    "bc_bio_cid": {
+      "type": "string",
+      "description": "IPFS上的简介文件CID"
+    },
+    "bc_avatar_cid": {
+      "type": "string",
+      "description": "IPFS上的头像图片CID"
+    },
+    "bc_cover_cid": {
+      "type": "string",
+      "description": "IPFS上的背景图片CID"
+    },
+    "create_time": {
+      "type": "number",
+      "description": "创建时间戳"
+    },
+    "update_time": {
+      "type": "number",
+      "description": "更新时间戳"
+    },
+    "is_celebrity": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否被红楼馆收录为名人榜"
+    },
+    "is_kyc": {
+      "type": "boolean",
+      "default": false,
+      "description": "身份信息是否为DAO验证"
+    },
+    "is_verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "邮箱地址是否被验证"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "作者状态是否激活"
+    }
+  },
+  "required": [
+    "bc_address",
+    "pseudonym"
+  ],
+  "indexes": [
+    [
+      "bc_address"
+    ],
+    [
+      "is_celebrity"
+    ],
+    [
+      "is_active"
+    ]
+  ]
+}

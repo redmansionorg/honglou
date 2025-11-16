@@ -54,17 +54,7 @@ export default function MobileNavbar({ user, onLogout, isLoadingUser }) {
                     </SheetClose>
                   );
                 })}
-                {user && user.role === 'admin' && (
-                  <SheetClose asChild>
-                      <Link
-                        to={createPageUrl("Administrator")}
-                        className={`flex items-center gap-4 px-4 py-3 rounded-lg text-lg font-medium transition-colors text-slate-700 hover:bg-slate-100`}
-                      >
-                        <Shield className="w-5 h-5" />
-                        <span>后台管理</span>
-                      </Link>
-                    </SheetClose>
-                )}
+                {/* xeyesu 11-10 */}
               </nav>
               <div className="absolute bottom-6 left-6 right-6">
                 {isLoadingUser ? (

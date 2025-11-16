@@ -1,0 +1,69 @@
+{
+  "name": "Chapter",
+  "type": "object",
+  "properties": {
+    "novel_id": {
+      "type": "string",
+      "description": "ID of the novel this chapter belongs to"
+    },
+    "chapter_number": {
+      "type": "number",
+      "description": "Chapter number in sequence"
+    },
+    "title": {
+      "type": "string",
+      "description": "Title of the chapter"
+    },
+    "content": {
+      "type": "string",
+      "description": "The actual chapter content",
+      "format": "textarea"
+    },
+    "word_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of words in the chapter"
+    },
+    "published": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the chapter is published"
+    },
+    "bc_novel_contract_address": {
+      "type": "string",
+      "description": "Contract address of the novel this chapter belongs to"
+    },
+    "bc_chapter_identifier": {
+      "type": "string",
+      "description": "Unique identifier for this chapter within the novel contract (tokenId or chapter number)"
+    },
+    "bc_content_cid": {
+      "type": "string",
+      "description": "IPFS CID for chapter content"
+    }
+  },
+  "required": [
+    "novel_id",
+    "chapter_number",
+    "title",
+    "content"
+  ],
+  "unique_together": [
+    [
+      "novel_id",
+      "chapter_number"
+    ]
+  ],
+  "indexes": [
+    [
+      "novel_id"
+    ],
+    [
+      "novel_id",
+      "chapter_number"
+    ],
+    [
+      "bc_novel_contract_address"
+    ]
+  ]
+}

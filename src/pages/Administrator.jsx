@@ -19,12 +19,12 @@ import {
 } from "lucide-react";
 
 // 导入所有管理组件
-import CreatorDashboardComponent from "../components/admin/CreatorDashboardComponent";
-import DataCleanupComponent from "../components/admin/DataCleanupComponent";
-import BlockchainSyncComponent from "../components/admin/BlockchainSyncComponent";
-import AuthorSyncComponent from "../components/admin/AuthorSyncComponent"; // 新增导入 AuthorSyncComponent
-import SchemaUpdateComponent from "../components/admin/SchemaUpdateComponent";
-import DebugComponent from "../components/admin/DebugComponent";
+import CreatorDashboardComponent from "@/components/admin/CreatorDashboardComponent";
+import DataCleanupComponent from "@/components/admin/DataCleanupComponent";
+import BlockchainSyncComponent from "@/components/admin/BlockchainSyncComponent";
+import AuthorSyncComponent from "@/components/admin/AuthorSyncComponent"; // 新增导入 AuthorSyncComponent
+import SchemaUpdateComponent from "@/components/admin/SchemaUpdateComponent";
+import DebugComponent from "@/components/admin/DebugComponent";
 
 const ADMIN_EMAIL = "xeyesu@gmail.com";
 

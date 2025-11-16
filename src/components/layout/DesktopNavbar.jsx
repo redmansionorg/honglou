@@ -69,17 +69,8 @@ export default function DesktopNavbar({ user, onLogout, isLoadingUser }) {
                         <span>我的</span>
                       </Link>
                     </DropdownMenuItem>
-                    {user.role === 'admin' && (
-                      <DropdownMenuItem asChild>
-                        <Link to={createPageUrl("Administrator")}>
-                          <Shield className="mr-2 h-4 w-4" />
-                          <span>后台管理</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    )}
-                    {user.role === 'admin' && (
-                      <DropdownMenuSeparator />
-                    )}
+                    {/* xeyesu 11-10 */}
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>退出登录</span>

@@ -9,7 +9,7 @@ import { BookOpen, Heart, Clock, CheckCircle2, AlertCircle } from "lucide-react"
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
-import NovelCard from "../components/novels/NovelCard";
+import NovelCard from "@/components/novels/NovelCard";
 
 export default function Library() {
   const [user, setUser] = useState(null);

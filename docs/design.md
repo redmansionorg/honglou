@@ -22,3 +22,6 @@ A browser-based mobile reading interface optimized for Redmansion novels. Future
 ## 🚫 Branding Notice
 
 Redmansion logos and icons are copyright protected and may not be reused, modified, or redistributed without prior approval.
+
+
+OG adding...

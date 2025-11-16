@@ -5,10 +5,10 @@ import { Link, useLocation } from "react-router-dom";
 import { User as UserEntity } from "@/api/entities";
 import { Home, Library, Search, User } from "lucide-react";
 import { createPageUrl } from "@/utils";
-import { CapacitorIntegration } from "./components/capacitor/CapacitorIntegration";
-import { initializeNativeApp } from "./components/capacitor/NativeStyles";
-import DesktopNavbar from "./components/layout/DesktopNavbar";
-import MobileNavbar from "./components/layout/MobileNavbar";
+import { CapacitorIntegration } from "@/components/capacitor/CapacitorIntegration";
+import { initializeNativeApp } from "@/components/capacitor/NativeStyles";
+import DesktopNavbar from "@/components/layout/DesktopNavbar";
+import MobileNavbar from "@/components/layout/MobileNavbar";
 
 const hideNavPages = ['Reader', 'CreatorDashboard', 'DataCleanup', 'BlockchainSync', 'Debug'];
 

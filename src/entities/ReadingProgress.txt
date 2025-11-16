@@ -1,0 +1,66 @@
+{
+  "name": "ReadingProgress",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "ID of the user"
+    },
+    "novel_id": {
+      "type": "string",
+      "description": "ID of the novel"
+    },
+    "current_chapter": {
+      "type": "number",
+      "default": 1,
+      "description": "Current chapter being read"
+    },
+    "progress_percentage": {
+      "type": "number",
+      "default": 0,
+      "description": "Reading progress as percentage"
+    },
+    "last_read_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the novel was last read"
+    },
+    "is_favorite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the novel is favorited"
+    },
+    "reading_status": {
+      "type": "string",
+      "enum": [
+        "reading",
+        "completed",
+        "plan-to-read",
+        "dropped"
+      ],
+      "default": "reading",
+      "description": "Current reading status"
+    },
+    "last_read_paragraph_index": {
+      "type": "number",
+      "default": 0,
+      "description": "Last read paragraph index in current chapter"
+    }
+  },
+  "required": [
+    "user_id",
+    "novel_id"
+  ],
+  "indexes": [
+    [
+      "user_id",
+      "novel_id"
+    ],
+    [
+      "user_id"
+    ],
+    [
+      "novel_id"
+    ]
+  ]
+}

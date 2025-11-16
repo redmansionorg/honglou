@@ -1,0 +1,83 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+/**
+ * 获取小说的章节列表（不包含 content 字段）
+ * 用于小说详情页和阅读器页面的章节列表展示
+ * 
+ * 输入参数：
+ * - novel_id: 小说ID
+ * 
+ * 返回：
+ * - chapters: 章节列表（不含 content 字段）
+ * - count: 章节总数
+ */
+
+Deno.serve(async (req) => {
+    try {
+        const base44 = createClientFromRequest(req);
+        
+        // 验证用户身份（可选，因为这是公开数据）
+        // 如果小说是公开的，不需要强制登录
+        let user = null;
+        try {
+            user = await base44.auth.me();
+        } catch (error) {
+            // 用户未登录，但允许访问公开数据
+            console.log("User not authenticated, allowing access to public data");
+        }
+
+        // 解析请求参数
+        const { novel_id } = await req.json();
+        
+        if (!novel_id) {
+            return new Response(JSON.stringify({ 
+                error: "novel_id is required" 
+            }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+            });
+        }
+
+        // 使用 service role 查询章节数据
+        const chapters = await base44.asServiceRole.entities.Chapter.filter(
+            { novel_id: novel_id },
+            "chapter_number",  // 按章节号排序
+            5000               // 最多返回 5000 章
+        );
+
+        // 移除 content 字段，只保留必要的元数据
+        const chaptersWithoutContent = chapters.map(chapter => ({
+            id: chapter.id,
+            novel_id: chapter.novel_id,
+            chapter_number: chapter.chapter_number,
+            title: chapter.title,
+            word_count: chapter.word_count,
+            published: chapter.published,
+            created_date: chapter.created_date,
+            updated_date: chapter.updated_date,
+            bc_novel_contract_address: chapter.bc_novel_contract_address,
+            bc_chapter_identifier: chapter.bc_chapter_identifier,
+            bc_content_cid: chapter.bc_content_cid
+            // 注意：不包含 content 字段
+        }));
+
+        return new Response(JSON.stringify({
+            success: true,
+            chapters: chaptersWithoutContent,
+            count: chaptersWithoutContent.length
+        }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+        });
+
+    } catch (error) {
+        console.error('Error in getNovelChaptersForList:', error);
+        return new Response(JSON.stringify({
+            error: error.message,
+            details: "Failed to fetch chapter list"
+        }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+        });
+    }
+});

@@ -1,0 +1,207 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+const OPUS_FACTORY_ABI = [
+    {"inputs":[],"name":"totalNovels","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"allNovels","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"novelInfos","outputs":[{"internalType":"address","name":"author","type":"address"},{"internalType":"address","name":"novelContract","type":"address"},{"internalType":"string","name":"title","type":"string"},{"internalType":"string","name":"synopsisCid","type":"string"},{"internalType":"string","name":"logoCid","type":"string"},{"internalType":"string","name":"pseudonym","type":"string"}],"stateMutability":"view","type":"function"}
+];
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function processImageUrl(ipfsUrl) {
+    console.log(`使用IPFS URL: ${ipfsUrl}`);
+    return ipfsUrl;
+}
+
+async function downloadTextFromIPFS(ipfsUrl, timeoutMs = 5000) {
+    try {
+        console.log(`下载文本: ${ipfsUrl}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        
+        const response = await fetch(ipfsUrl, { 
+            signal: controller.signal,
+            headers: {
+                'Accept': 'text/plain,text/*,*/*',
+                'User-Agent': 'Mozilla/5.0 (compatible; NovelApp/1.0)'
+            }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const text = await response.text();
+        return text.trim();
+    } catch (error) {
+        console.error(`文本下载失败 ${ipfsUrl}:`, error.message);
+        return null;
+    }
+}
+
+Deno.serve(async (req) => {
+    try {
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) return new Response(JSON.stringify({ error: "未授权" }), { status: 401 });
+        
+        const base44 = createClientFromRequest(req);
+        base44.auth.setToken(authHeader.split(' ')[1]);
+        await base44.auth.me();
+
+        const { ethers } = await import('npm:ethers@6.7.1');
+        
+        const rpcUrl = Deno.env.get("SEPOLIA_RPC_URL");
+        let ipfsGateway = Deno.env.get("IPFS_GATEWAY_URL") || "";
+        const factoryAddress = Deno.env.get("OPUS_FACTORY_CONTRACT_ADDRESS");
+
+        if (ipfsGateway) {
+            ipfsGateway = ipfsGateway.replace(/\/ipfs\/?$/, "").replace(/\/$/, "");
+        }
+
+        if (!rpcUrl || !ipfsGateway || !factoryAddress) {
+            throw new Error("缺少必要的环境变量");
+        }
+
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const factoryContract = new ethers.Contract(factoryAddress, OPUS_FACTORY_ABI, provider);
+        
+        const totalNovels = await factoryContract.totalNovels();
+        const totalNovelsNumber = parseInt(totalNovels.toString());
+
+        console.log(`[SyncNovels] Processing ${totalNovelsNumber} novels`);
+
+        const stats = {
+            processed: 0,
+            created: 0,
+            updated: 0,
+            skippedUnpublished: 0,
+            errors: 0
+        };
+        
+        const processedNovels = [];
+
+        for (let i = 0; i < totalNovelsNumber; i++) {
+            try {
+                await delay(500);
+                
+                const novelAddress = await factoryContract.allNovels(i);
+                const novelInfo = await factoryContract.novelInfos(novelAddress);
+                
+                // 基础的区块链数据
+                const blockchainData = {
+                    title: novelInfo[2] || "Untitled",
+                    author: novelInfo[5] || novelInfo[0],
+                    bc_contract_address: novelInfo[1].toLowerCase(),
+                    bc_author_address: novelInfo[0].toLowerCase(),
+                    bc_pseudonym: novelInfo[5],
+                    bc_synopsis_cid: novelInfo[3],
+                    bc_logo_cid: novelInfo[4],
+                    bc_registry_address: factoryAddress.toLowerCase()
+                };
+
+                // 下载 IPFS 数据
+                const [description, coverImageUrl] = await Promise.all([
+                    novelInfo[3] ? downloadTextFromIPFS(`${ipfsGateway}/ipfs/${novelInfo[3]}`, 3000) : Promise.resolve(null),
+                    novelInfo[4] ? processImageUrl(`${ipfsGateway}/ipfs/${novelInfo[4]}`) : null
+                ]);
+
+                if (description) blockchainData.description = description;
+                if (coverImageUrl) blockchainData.cover_image = coverImageUrl;
+
+                const existing = await base44.entities.Novel.filter({ bc_contract_address: novelInfo[1].toLowerCase() });
+                
+                let savedNovel;
+                if (existing.length > 0) {
+                    // 更新现有小说
+                    if (existing[0].is_published === false) {
+                        stats.skippedUnpublished++;
+                        continue;
+                    }
+                    
+                    // 准备更新数据：只更新区块链相关字段
+                    const updateData = { ...blockchainData };
+                    delete updateData.is_published;
+                    
+                    // ⚠️ 关键修改：保留用户手动设置的字段
+                    // 如果现有小说的 genre 不是"其他分类"，说明用户手动修改过，不覆盖
+                    if (existing[0].genre && existing[0].genre !== "其他分类") {
+                        delete updateData.genre;
+                    } else {
+                        // 如果是"其他分类"，则使用默认值
+                        updateData.genre = "其他分类";
+                    }
+                    
+                    // 如果现有小说的 description 不是"加载中..."，说明可能是用户修改的或之前同步的
+                    // 只有当新下载的 description 存在且有效时才更新
+                    if (existing[0].description && existing[0].description !== "加载中..." && !description) {
+                        delete updateData.description;
+                    }
+                    
+                    // 如果现有小说的 status 已设置，保留它
+                    if (existing[0].status) {
+                        delete updateData.status;
+                    } else {
+                        updateData.status = "ongoing";
+                    }
+                    
+                    // 如果content_updated_date为null，则设置为created_date
+                    if (!existing[0].content_updated_date) {
+                        updateData.content_updated_date = existing[0].created_date;
+                    }
+
+                    savedNovel = await base44.entities.Novel.update(existing[0].id, updateData);
+                    stats.updated++;
+                } else {
+                    // 创建新小说：使用所有默认值
+                    const newNovelData = {
+                        ...blockchainData,
+                        description: blockchainData.description || "加载中...",
+                        genre: "其他分类",
+                        status: "ongoing",
+                        is_published: true
+                    };
+                    
+                    const newNovel = await base44.entities.Novel.create(newNovelData);
+                    
+                    // 将content_updated_date设置为刚创建的created_date
+                    savedNovel = await base44.entities.Novel.update(newNovel.id, {
+                        content_updated_date: newNovel.created_date
+                    });
+                    stats.created++;
+                }
+                
+                processedNovels.push(savedNovel);
+                stats.processed++;
+            } catch (error) {
+                console.error(`处理小说索引 ${i} 时出错:`, error.message);
+                stats.errors++;
+            }
+        }
+        
+        let summary = `处理完成。新增: ${stats.created}, 更新: ${stats.updated}, 错误: ${stats.errors}`;
+        if (stats.skippedUnpublished > 0) {
+            summary += `, 跳过未上架: ${stats.skippedUnpublished}`;
+        }
+
+        return new Response(JSON.stringify({ 
+            success: true,
+            summary: summary,
+            stats: stats,
+            processedNovels: processedNovels
+        }), {
+            headers: { "Content-Type": "application/json" },
+        });
+
+    } catch (error) {
+        console.error('Sync novels error:', error);
+        return new Response(JSON.stringify({ 
+            error: error.message, 
+            details: "同步小说时出现错误，请检查日志。"
+        }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+        });
+    }
+});

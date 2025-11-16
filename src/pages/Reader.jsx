@@ -16,14 +16,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import CommentModal from "../components/comments/CommentModal";
-import ShareButton from "../components/share/ShareButton";
+import CommentModal from "@/components/comments/CommentModal";
+import ShareButton from "@/components/share/ShareButton";
 import { Badge } from "@/components/ui/badge";
-import { CapacitorIntegration } from "../components/capacitor/CapacitorIntegration";
-import { initializeNativeApp } from "../components/capacitor/NativeStyles";
+import { CapacitorIntegration } from "@/components/capacitor/CapacitorIntegration";
+import { initializeNativeApp } from "@/components/capacitor/NativeStyles";
 import { getNovelChaptersForList } from "@/api/functions";
-import { chapterListCacheManager } from "../components/utils/ChapterListCacheManager";
-import ChapterListSidebar from "../components/novel/ChapterListSidebar";
+import { chapterListCacheManager } from "@/components/utils/ChapterListCacheManager";
+import ChapterListSidebar from "@/components/novel/ChapterListSidebar";
 
 function useThrottle(callback, delay) {
   const lastRan = useRef(Date.now());

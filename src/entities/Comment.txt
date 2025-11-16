@@ -1,0 +1,71 @@
+{
+  "name": "Comment",
+  "type": "object",
+  "properties": {
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "novel",
+        "chapter",
+        "paragraph"
+      ],
+      "description": "评论目标类型：小说、章节或段落"
+    },
+    "target_id": {
+      "type": "string",
+      "description": "目标内容的ID"
+    },
+    "paragraph_index": {
+      "type": "number",
+      "description": "如果是段落评论，段落的索引位置"
+    },
+    "parent_comment_id": {
+      "type": "string",
+      "description": "父评论ID（用于回复）"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "评论用户ID"
+    },
+    "user_name": {
+      "type": "string",
+      "description": "评论用户名称"
+    },
+    "content": {
+      "type": "string",
+      "description": "评论内容"
+    },
+    "likes_count": {
+      "type": "number",
+      "default": 0,
+      "description": "点赞数"
+    },
+    "replies_count": {
+      "type": "number",
+      "default": 0,
+      "description": "回复数"
+    }
+  },
+  "required": [
+    "target_type",
+    "target_id",
+    "user_id",
+    "user_name",
+    "content"
+  ],
+  "indexes": [
+    [
+      "target_type",
+      "target_id"
+    ],
+    [
+      "target_id"
+    ],
+    [
+      "user_id"
+    ],
+    [
+      "parent_comment_id"
+    ]
+  ]
+}

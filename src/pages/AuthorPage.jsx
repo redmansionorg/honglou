@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, BookOpen, Star, Eye, Award, Mail, ExternalLink, Verified } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { imageCacheManager } from "../components/utils/ImageCacheManager";
+import { imageCacheManager } from "@/components/utils/ImageCacheManager";
 
-import NovelCard from "../components/novels/NovelCard";
+import NovelCard from "@/components/novels/NovelCard";
 
 export default function AuthorPage() {
   const [author, setAuthor] = useState(null);

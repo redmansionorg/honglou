@@ -1,0 +1,185 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
+
+const LITERATURE_OPUS_ABI = [
+	{ "inputs": [ { "components": [ { "internalType": "address", "name": "account", "type": "address" }, { "internalType": "string", "name": "pseudonym", "type": "string" }, { "internalType": "bytes32", "name": "puid", "type": "bytes32" } ], "internalType": "struct ILiteratureOpus.AuthorIdentity", "name": "_author", "type": "tuple" }, { "components": [ { "internalType": "string", "name": "title", "type": "string" }, { "internalType": "string", "name": "synopsisCid", "type": "string" }, { "internalType": "string", "name": "logoCid", "type": "string" }, { "internalType": "bytes32", "name": "buid", "type": "bytes32" }, { "internalType": "uint256", "name": "price", "type": "uint256" }, { "internalType": "uint256", "name": "lock", "type": "uint256" }, { "internalType": "string", "name": "metadataCid", "type": "string" }, { "internalType": "bool", "name": "mature", "type": "bool" }, { "internalType": "bool", "name": "completed", "type": "bool" } ], "internalType": "struct ILiteratureOpus.Book", "name": "_book", "type": "tuple" }, { "components": [ { "internalType": "bytes32", "name": "ruid", "type": "bytes32" }, { "internalType": "string", "name": "terms", "type": "string" }, { "internalType": "uint256", "name": "royalty", "type": "uint256" }, { "internalType": "uint256", "name": "advance", "type": "uint256" }, { "internalType": "bytes32", "name": "luid", "type": "bytes32" } ], "internalType": "struct ILiteratureOpus.License", "name": "_license", "type": "tuple" }, { "internalType": "address", "name": "registry", "type": "address" } ], "stateMutability": "nonpayable", "type": "constructor" },
+    { "inputs": [], "name": "totalChapters", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" },
+    { "inputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "name": "chapters", "outputs": [ { "internalType": "uint256", "name": "id", "type": "uint256" }, { "internalType": "string", "name": "title", "type": "string" }, { "internalType": "string", "name": "contentCid", "type": "string" }, { "internalType": "uint256", "name": "wordCount", "type": "uint256" }, { "internalType": "bytes32", "name": "cuid", "type": "bytes32" }, { "internalType": "bool", "name": "published", "type": "bool" }, { "components": [ { "internalType": "bytes32", "name": "auid", "type": "bytes32" }, { "internalType": "bytes32", "name": "huid", "type": "bytes32" }, { "internalType": "bytes32", "name": "suid", "type": "bytes32" }, { "internalType": "uint256", "name": "timestamp", "type": "uint256" } ], "internalType": "struct ILiteratureOpus.Audit", "name": "audit", "type": "tuple" }, { "internalType": "string", "name": "metadataCid", "type": "string" } ], "stateMutability": "view", "type": "function" },
+    { "inputs": [ { "internalType": "uint256", "name": "id", "type": "uint256" } ], "name": "uri", "outputs": [ { "internalType": "string", "name": "", "type": "string" } ], "stateMutability": "view", "type": "function"}
+];
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function downloadChapterContentFromIPFS(ipfsUrl) {
+    try {
+        const response = await fetch(ipfsUrl, { signal: AbortSignal.timeout(15000) });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const content = await response.text();
+        return content.trim();
+    } catch (error) {
+        console.error(`Error downloading chapter content from ${ipfsUrl}:`, error.message);
+        return null;
+    }
+}
+
+function countWords(text) {
+    if (!text) return 0;
+    const cleanText = text.replace(/\s+/g, ' ').trim();
+    const chineseChars = cleanText.match(/[\u4e00-\u9fff]/g);
+    const englishWords = cleanText.match(/[a-zA-Z]+/g);
+    return (chineseChars ? chineseChars.length : 0) + (englishWords ? englishWords.length : 0);
+}
+
+Deno.serve(async (req) => {
+    try {
+        const { novel_id, sync_type = "full" } = await req.json();
+        if (!novel_id) throw new Error("novel_id is required");
+
+        const base44 = createClientFromRequest(req);
+        const user = await base44.auth.me();
+        if (!user) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+        }
+
+        const { ethers } = await import('npm:ethers@6.7.1');
+        
+        const rpcUrl = Deno.env.get("SEPOLIA_RPC_URL");
+        let ipfsGateway = Deno.env.get("IPFS_GATEWAY_URL") || "";
+        if (ipfsGateway) {
+            ipfsGateway = ipfsGateway.replace(/\/ipfs\/?$/, "").replace(/\/$/, "");
+        }
+        if (!rpcUrl || !ipfsGateway) {
+            throw new Error("Missing required environment variables (SEPOLIA_RPC_URL, IPFS_GATEWAY_URL)");
+        }
+
+        const novel = await base44.asServiceRole.entities.Novel.get(novel_id);
+        if (!novel || !novel.bc_contract_address) {
+            throw new Error("Novel or its contract address not found.");
+        }
+        if (novel.is_published === false) {
+             throw new Error("Cannot sync chapters for an unpublished novel.");
+        }
+
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const novelContract = new ethers.Contract(novel.bc_contract_address, LITERATURE_OPUS_ABI, provider);
+
+        const totalChaptersOnChain = await novelContract.totalChapters();
+        const totalChaptersNumber = parseInt(totalChaptersOnChain.toString());
+        
+        let startTokenId = 1;
+        if (sync_type === "incremental") {
+            const latestChapters = await base44.asServiceRole.entities.Chapter.filter({ novel_id: novel.id }, "-chapter_number", 1);
+            const lastSyncedChapter = latestChapters.length > 0 ? latestChapters[0].chapter_number : 0;
+            startTokenId = lastSyncedChapter + 1;
+        }
+        
+        if (startTokenId > totalChaptersNumber) {
+            return new Response(JSON.stringify({ 
+                success: true,
+                summary: `增量同步完成，没有新章节需要同步。`,
+                stats: { chaptersCreated: 0, chaptersUpdated: 0, errors: 0 }
+            }), { headers: { "Content-Type": "application/json" } });
+        }
+
+        let stats = {
+            chaptersCreated: 0,
+            chaptersUpdated: 0,
+            errors: 0
+        };
+
+        for (let tokenId = startTokenId; tokenId <= totalChaptersNumber; tokenId++) {
+            await delay(200);
+
+            try {
+                const chapterInfo = await novelContract.chapters(tokenId);
+                const chapterUri = await novelContract.uri(tokenId);
+                
+                let content = "内容加载失败，请联系管理员。";
+                let wordCount = 0;
+                if (chapterUri) {
+                    let contentUrl = chapterUri.startsWith('http') ? chapterUri : `${ipfsGateway}/ipfs/${chapterUri.replace('ipfs://', '')}`;
+                    const downloadedContent = await downloadChapterContentFromIPFS(contentUrl);
+                    if (downloadedContent) {
+                        content = downloadedContent;
+                        wordCount = countWords(content);
+                    }
+                }
+
+                const chapterData = {
+                    novel_id: novel.id,
+                    chapter_number: tokenId,
+                    title: chapterInfo.title.trim(),
+                    content: content,
+                    word_count: wordCount,
+                    published: true,
+                    bc_novel_contract_address: novel.bc_contract_address,
+                    bc_chapter_identifier: tokenId.toString(),
+                    bc_content_cid: chapterUri || ""
+                };
+
+                const existing = await base44.asServiceRole.entities.Chapter.filter({ 
+                    novel_id: novel.id, 
+                    chapter_number: tokenId 
+                });
+                
+                if (existing.length > 0) {
+                    await base44.asServiceRole.entities.Chapter.update(existing[0].id, chapterData);
+                    stats.chaptersUpdated++;
+                } else {
+                    try {
+                        await base44.asServiceRole.entities.Chapter.create(chapterData);
+                        stats.chaptersCreated++;
+                    } catch (createError) {
+                        // 捕获唯一性约束冲突错误
+                        // Base44 SDK 的错误对象可能包含 unique_together 相关信息
+                        const errorMsg = createError.message || '';
+                        if (errorMsg.includes('unique') || errorMsg.includes('constraint') || errorMsg.includes('duplicate')) {
+                            console.warn(`Unique constraint violation for chapter ${novel.id}-${tokenId}. Treating as already synced.`);
+                            // 尝试更新该章节
+                            const retryExisting = await base44.asServiceRole.entities.Chapter.filter({ 
+                                novel_id: novel.id, 
+                                chapter_number: tokenId 
+                            });
+                            if (retryExisting.length > 0) {
+                                await base44.asServiceRole.entities.Chapter.update(retryExisting[0].id, chapterData);
+                            }
+                            stats.chaptersUpdated++;
+                        } else {
+                            // 其他创建错误，仍然计入错误
+                            throw createError; 
+                        }
+                    }
+                }
+            } catch (chapterError) {
+                console.error(`Error processing chapter ${tokenId}:`, chapterError);
+                stats.errors++;
+            }
+        }
+        
+        const updateData = { total_chapters: totalChaptersNumber };
+        
+        if (sync_type === 'incremental' && stats.chaptersCreated > 0) {
+            updateData.content_updated_date = new Date().toISOString();
+        }
+        
+        await base44.asServiceRole.entities.Novel.update(novel.id, updateData);
+
+        const syncTypeName = sync_type === 'incremental' ? '增量同步' : '全量同步';
+        return new Response(JSON.stringify({ 
+            success: true,
+            summary: `${syncTypeName}完成。新增: ${stats.chaptersCreated}, 更新: ${stats.chaptersUpdated}, 错误: ${stats.errors}`,
+            stats: stats,
+        }), {
+            headers: { "Content-Type": "application/json" },
+        });
+
+    } catch (error) {
+        console.error('Sync chapters error:', error);
+        return new Response(JSON.stringify({ 
+            error: error.message, 
+            details: "An error occurred during chapter sync. Check logs for details."
+        }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+        });
+    }
+});

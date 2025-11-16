@@ -1,0 +1,30 @@
+{
+  "name": "Like",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "点赞用户ID"
+    },
+    "comment_id": {
+      "type": "string",
+      "description": "被点赞的评论ID"
+    }
+  },
+  "required": [
+    "user_id",
+    "comment_id"
+  ],
+  "indexes": [
+    [
+      "user_id",
+      "comment_id"
+    ],
+    [
+      "user_id"
+    ],
+    [
+      "comment_id"
+    ]
+  ]
+}

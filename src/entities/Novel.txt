@@ -1,0 +1,129 @@
+{
+  "name": "Novel",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "The title of the novel"
+    },
+    "author": {
+      "type": "string",
+      "description": "Author of the novel"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description or synopsis"
+    },
+    "genre": {
+      "type": "string",
+      "enum": [
+        "玄幻·奇幻",
+        "都市·现实",
+        "仙侠·武侠",
+        "历史·军事",
+        "科幻·游戏",
+        "悬疑·惊悚",
+        "古代言情",
+        "现代言情",
+        "二次元·衍生",
+        "其他分类"
+      ],
+      "description": "Genre of the novel"
+    },
+    "cover_image": {
+      "type": "string",
+      "description": "URL to the cover image"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ongoing",
+        "completed",
+        "hiatus"
+      ],
+      "default": "ongoing",
+      "description": "Publication status"
+    },
+    "is_published": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the novel is published/visible to users (true=上架, false=下架)"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags for the novel"
+    },
+    "total_chapters": {
+      "type": "number",
+      "default": 0,
+      "description": "Total number of chapters"
+    },
+    "reads_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of reads"
+    },
+    "rating": {
+      "type": "number",
+      "default": 0,
+      "description": "Average rating out of 5"
+    },
+    "content_updated_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp for the last content (chapter) update"
+    },
+    "bc_contract_address": {
+      "type": "string",
+      "description": "LiteratureOpus contract address on Sepolia blockchain"
+    },
+    "bc_author_address": {
+      "type": "string",
+      "description": "Author's blockchain address"
+    },
+    "bc_pseudonym": {
+      "type": "string",
+      "description": "Author's pseudonym registered on blockchain"
+    },
+    "bc_synopsis_cid": {
+      "type": "string",
+      "description": "IPFS CID for novel synopsis"
+    },
+    "bc_logo_cid": {
+      "type": "string",
+      "description": "IPFS CID for novel cover image"
+    },
+    "bc_registry_address": {
+      "type": "string",
+      "description": "OpusFactory contract address that registered this novel"
+    }
+  },
+  "required": [
+    "title",
+    "author",
+    "description",
+    "genre"
+  ],
+  "unique_together": [
+    [
+      "bc_contract_address"
+    ]
+  ],
+  "indexes": [
+    [
+      "is_published"
+    ],
+    [
+      "bc_author_address"
+    ],
+    [
+      "genre"
+    ],
+    [
+      "status"
+    ]
+  ]
+}
